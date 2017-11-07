@@ -1,0 +1,16 @@
+{
+  "name": "classnames",
+  "description": "TODO.",
+  "version": "0.0.0",
+  "releasenote": "TODO. (See CHANGELOG.md)",
+  "url": "https://github.com/kLabz/haxe-classnames",
+  "license": "MIT",
+  "tags": [
+    "javascript",
+    "redux"
+  ],
+  "classPath": "src",
+  "contributors": [
+    "klabz"
+  ]
+}

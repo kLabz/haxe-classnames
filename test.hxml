@@ -1,0 +1,13 @@
+-js bin/test.js
+-main test.ClassNamesTests
+
+-cp src
+-lib buddy
+
+-D nodejs
+-D buddy-colors
+-D reporter=buddy.reporting.ConsoleColorReporter
+
+# -D classnames_fast_infos
+# -D classnames_fast_warnings
+# -D classnames_no_trim
