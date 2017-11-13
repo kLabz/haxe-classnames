@@ -10,4 +10,4 @@
 
 # -D classnames_fast_infos
 # -D classnames_fast_warnings
-# -D classnames_no_trim
+-D classnames_no_trim
