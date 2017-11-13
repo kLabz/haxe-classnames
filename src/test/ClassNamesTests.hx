@@ -5,4 +5,4 @@ import test.suite.*;
 
 class ClassNamesTests implements Buddy<[
 	NpmIndexTests
-]> { }
+]> {}
