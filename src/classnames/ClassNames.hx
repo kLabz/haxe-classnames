@@ -87,6 +87,14 @@ class ClassNames {
 	#end
 #end
 
+	public static function arrayToMap(arr:Array<String>):Dynamic<Bool> {
+		var map = {};
+
+		for (a in arr) Reflect.setField(map, a, true);
+
+		return map;
+	}
+
 	/**
 	 * Macro implementation of classNames(), doing most of the work at compile-time.
 	 * Falls back to runtime code for objects it cannot handle (e.g. object as ref instead of inline).
