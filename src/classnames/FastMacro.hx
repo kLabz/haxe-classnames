@@ -65,7 +65,7 @@ class FastMacro {
 		var pos = Context.currentPos();
 		var hasFallback = Lambda.find(classes, function(c) {
 			return switch (c) {
-				case Fallback(_): true;
+				case Fallback(_), Runtime(_): true;
 				default: false;
 			};
 		}) != null;
@@ -191,7 +191,8 @@ class FastMacro {
 			// #if classnames_fast_infos
 			// Context.warning('[Info] ClassNames: class "$s" hardcoded', pos);
 			// #end
-			classes = appendClassExpr(classes, options, s, Hardcoded);
+			for (c in ~/\s+/.split(s))
+				classes = appendClassExpr(classes, options, c, Hardcoded);
 
 			case EConst(CIdent(i)), EConst(CInt(i)) if (i == "true" || i == "false" || i == "0" || i == "null"):
 			#if classnames_fast_infos
@@ -411,7 +412,7 @@ class FastMacro {
 				closeMap(maps, currentMap, pos);
 				maps.push(macro {
 					var a = {};
-					Reflect.setField(a, $i{ident}, true);
+					for (f in ~/\s+/.split($i{ident})) Reflect.setField(a, f, true);
 					a;
 				});
 				currentMap = [];

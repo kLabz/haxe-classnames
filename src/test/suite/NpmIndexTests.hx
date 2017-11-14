@@ -77,7 +77,6 @@ class NpmIndexTests extends SingleSuite {
 			});
 
 			it("handles all types of truthy and falsy property values as expected", {
-				var obj = {foo: null, bar: true};
 				JSClassNames.classNames({
 					// falsy:
 					"null": null,
@@ -168,7 +167,6 @@ class NpmIndexTests extends SingleSuite {
 			});
 
 			it("handles all types of truthy and falsy property values as expected", {
-				var obj = {foo: null, bar: true};
 				ClassNames.fast({
 					// falsy:
 					"null": null,
@@ -259,7 +257,6 @@ class NpmIndexTests extends SingleSuite {
 			});
 
 			it("handles all types of truthy and falsy property values as expected", {
-				var obj = {foo: null, bar: true};
 				ClassNames.fastNull({
 					// falsy:
 					"null": null,
