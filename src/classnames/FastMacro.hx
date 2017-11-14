@@ -25,6 +25,7 @@ typedef FastOptions = {
 enum ClassDefinition {
 	CompileTime(key:String, mappedKey:Null<String>, condition:ClassCondition);
 	Runtime(ident:String);
+	RuntimeArray(ident:String);
 	Fallback(ident:String);
 }
 
@@ -44,7 +45,6 @@ class FastMacro {
 
 		TODO: misc
 		- error messages for invalid arguments
-		- (?) debug infos with positions
 	*/
 	public static function fast(opt:Array<FastOption>, args:Array<Expr>) {
 		var classes:Array<ClassDefinition> = [];
@@ -117,15 +117,9 @@ class FastMacro {
 
 				switch (f.expr.expr) {
 					case EConst(CIdent("false")):
-					// #if classnames_fast_infos
-					// Context.warning('[Info] ClassNames: class "$fieldName" safely ignored', pos);
-					// #end
 					classes = appendClassExpr(classes, options, fieldName, Ignored);
 
 					case EConst(CIdent("true")), EObjectDecl(_), EArrayDecl(_), EBlock([]):
-					// #if classnames_fast_infos
-					// Context.warning('[Info] ClassNames: class "$fieldName" hardcoded', pos);
-					// #end
 					classes = appendClassExpr(classes, options, fieldName, Hardcoded);
 
 					default:
@@ -134,42 +128,24 @@ class FastMacro {
 
 						switch (value) {
 							case false, 0, "", null:
-							// #if classnames_fast_infos
-							// Context.warning('[Info] ClassNames: class "$fieldName" safely ignored', pos);
-							// #end
 							classes = appendClassExpr(classes, options, fieldName, Ignored);
 
 							case true:
-							// #if classnames_fast_infos
-							// Context.warning('[Info] ClassNames: class "$fieldName" hardcoded', pos);
-							// #end
 							classes = appendClassExpr(classes, options, fieldName, Hardcoded);
 
 							case s if (Std.is(s, String)):
-							// #if classnames_fast_infos
-							// Context.warning('[Info] ClassNames: class "$fieldName" hardcoded', pos);
-							// #end
 							classes = appendClassExpr(classes, options, fieldName, Hardcoded);
 
 							case i if (Std.is(i, Int) && i != 0):
-							// #if classnames_fast_infos
-							// Context.warning('[Info] ClassNames: class "$fieldName" hardcoded', pos);
-							// #end
 							classes = appendClassExpr(classes, options, fieldName, Hardcoded);
 
 							case f if (Std.is(f, Float) && f != 0):
-							// #if classnames_fast_infos
-							// Context.warning('[Info] ClassNames: class "$fieldName" hardcoded', pos);
-							// #end
 							classes = appendClassExpr(classes, options, fieldName, Hardcoded);
 
 							default:
 							throw "Fallback to runtime";
 						}
 					} catch(e:Dynamic) {
-						// #if classnames_fast_infos
-						// Context.warning('[Info] ClassNames: class "$fieldName" added with runtime check', pos);
-						// #end
 						var clsExpr = macro {
 							// Ensure haxe compiler checks this expression, but let dce remove this line
 							${f.expr};
@@ -188,9 +164,6 @@ class FastMacro {
 			#end
 
 			case EConst(CString(s)):
-			// #if classnames_fast_infos
-			// Context.warning('[Info] ClassNames: class "$s" hardcoded', pos);
-			// #end
 			for (c in ~/\s+/.split(s))
 				classes = appendClassExpr(classes, options, c, Hardcoded);
 
@@ -200,28 +173,38 @@ class FastMacro {
 			#end
 
 			case EConst(CInt(i)):
-			// #if classnames_fast_infos
-			// Context.warning('[Info] ClassNames: class "$i" hardcoded', pos);
-			// #end
 			classes = appendClassExpr(classes, options, i, Hardcoded);
 
 			case EConst(CIdent(i)):
 			switch (Context.typeExpr(arg).t) {
 				case t if (isDynamicBool(t)):
-				// #if classnames_fast_warnings
-				// Context.warning('[Warn] ClassNames: falling back to runtime implementation.', pos);
-				// #end
 				appendFallback(classes, i);
 
-				case t if (isString(t)):
-				// #if classnames_fast_infos
-				// Context.warning('[Info] ClassNames: hardcoded string reference', pos);
-				// #end
+				case t if (isInstOf(t, "String")):
 				appendRuntime(classes, i);
 
-				default:
+				case TInst(arrInst, [TInst(strInst, [])])
+				if (arrInst.toString() == "Array" && strInst.toString() == "String"):
+				appendRuntimeArray(classes, i);
+
+				// Unsupported types
+
+				case TAnonymous(_):
+				Context.error('Reference to object should be of type Dynamic<Bool>', pos);
+
+				case t if (isInstOf(t, "Int")):
+				Context.error('Reference to int not allowed. Use string instead?', pos);
+
+				case t if (isInstOf(t, "Bool")):
+				Context.error('Reference to boolean not allowed. Use string instead?', pos);
+
+				case TInst(arrInst, params) if (arrInst.toString() == "Array"):
+				Context.error('Reference to non-string Array not allowed. Use Array<String> instead?', pos);
+
+				case typed:
 				// TODO: explicit error message
 				trace(arg);
+				trace(typed);
 				Context.error('Unsupported argument (Econst(CIdent(i)))', pos);
 			}
 
@@ -241,16 +224,18 @@ class FastMacro {
 		return classes;
 	}
 
+	static function isInstOf(type:Type, of:String):Bool {
+		return switch(type) {
+			case TInst(a, _) if (a.toString() == of): true;
+			case TAbstract(a, _) if (a.toString() == of): true;
+			default: false;
+		};
+	}
+
 	static function isDynamicBool(type:Type):Bool {
 		var ctDynamicBool = macro :Dynamic<Bool>;
 		var tDynamicBool = ctDynamicBool.toType();
 		return TypeTools.unify(type, tDynamicBool);
-	}
-
-	static function isString(type:Type):Bool {
-		var ctString = macro :String;
-		var tString = ctString.toType();
-		return TypeTools.unify(type, tString);
 	}
 
 	static function appendClassExpr(
@@ -305,6 +290,13 @@ class FastMacro {
 		classes.push(Runtime(ident));
 	}
 
+	static function appendRuntimeArray(
+		classes:Array<ClassDefinition>,
+		ident:String
+	):Void {
+		classes.push(RuntimeArray(ident));
+	}
+
 	static function getMappedKey(map:Dynamic<String>, key:String):Null<String> {
 		if (Reflect.hasField(map, key)) return Reflect.field(map, key);
 		return null;
@@ -335,6 +327,10 @@ class FastMacro {
 				case Runtime(ident):
 				if (expr == null) needsTrim = true;
 				concatExprs(expr, macro " " + $i{ident}, pos);
+
+				case RuntimeArray(ident):
+				if (expr == null) needsTrim = true;
+				concatExprs(expr, macro " " + $i{ident}.join(" "), pos);
 
 				case Fallback(ident):
 				if (expr == null) needsTrim = true;
@@ -416,6 +412,13 @@ class FastMacro {
 					a;
 				});
 				currentMap = [];
+				hasRuntimeOrFallback = true;
+
+				case RuntimeArray(ident):
+				closeMap(maps, currentMap, pos);
+				maps.push(macro classnames.ClassNames.arrayToMap($i{ident}));
+				currentMap = [];
+				hasRuntimeOrFallback = true;
 				hasRuntimeOrFallback = true;
 
 				case Fallback(ident):
