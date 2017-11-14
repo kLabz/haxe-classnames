@@ -1,11 +1,18 @@
 package classnames;
 
 class ClassNames {
+#if !macro
+	#if js
 	static var hasOwnProperty;
 
-	// TODO: non-js version
-	public static function fromMaps(classMaps:Array<Dynamic<Bool>>):String {
+	public static function fromMaps(
+		classMaps:Array<Dynamic<Bool>>,
+		?nullIfEmpty:Bool = false
+	):String {
 		var o = {};
+
+		if (hasOwnProperty == null)
+			hasOwnProperty = untyped __js__('Object').prototype.hasOwnProperty;
 
 		for (classMap in classMaps) untyped {
 			__js__("for (var k in classMap) {");
@@ -16,11 +23,13 @@ class ClassNames {
 			__js__("}");
 		}
 
-		return fromMap(o);
+		return fromMap(o, nullIfEmpty);
 	}
 
-	// TODO: non-js version
-	public static function fromMap(classMap:Dynamic<Bool>):String {
+	public static function fromMap(
+		classMap:Dynamic<Bool>,
+		?nullIfEmpty:Bool = false
+	):String {
 		var classNames = [];
 		var hasClassNames = false;
 
@@ -39,9 +48,44 @@ class ClassNames {
 		};
 
 		if (hasClassNames) return classNames.join(" ");
-		return "";
+		return nullIfEmpty ? null : "";
+	}
+	#else
+	public static function fromMaps(
+		classMaps:Array<Dynamic<Bool>>,
+		?nullIfEmpty:Bool = false
+	):String {
+		var o = {};
+
+		for (classMap in classMaps) untyped {
+			for (k in Reflect.fields(classMap)) {
+				var val = Reflect.field(classMap, k);
+				Reflect.setField(o, k, val);
+			}
+		}
+
+		fromMap(o, nullIfEmpty);
 	}
 
+	public static function fromMap(
+		classMap:Dynamic<Bool>,
+		?nullIfEmpty:Bool = false
+	):String {
+		var classNames = [];
+		var hasClassNames = false;
+
+		for (k in Reflect.fields(classMap)) {
+			if (Reflect.field(classMap, k)) {
+				classNames.push(k);
+				hasClassNames = true;
+			}
+		}
+
+		if (hasClassNames) return classNames.join(" ");
+		return nullIfEmpty ? null : "";
+	}
+	#end
+#end
 
 	/**
 	 * Macro implementation of classNames(), doing most of the work at compile-time.
