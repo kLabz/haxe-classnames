@@ -1,6 +1,41 @@
 package classnames;
 
 class ClassNames {
+	/**
+	 * Macro implementation of classNames(), doing most of the work at compile-time.
+	 * Falls back to runtime code for objects it cannot handle (e.g. object as ref instead of inline).
+	 *
+	 * Since the npm version accepts pretty much anything as input, so does this version.
+	 * Accepted argument types are (mainly) String, Dynamic<String>, and [mixed] Arrays of these.
+	 */
+	macro public static inline function fast(args:Array<haxe.macro.Expr>):ExprOf<String> {
+		return FastMacro.fast([], args);
+	}
+
+	/**
+	 * Same as fast(), but will return null instead of an empty string.
+	 * This is useful when dealing with React, which will ignore the className attribute if null.
+	 */
+	macro public static inline function fastNull(args:Array<haxe.macro.Expr>):ExprOf<String> {
+		return FastMacro.fast([NullIfEmpty], args);
+	}
+
+	/**
+	 * Same as fast(), but will return {className: "[fast() result]"} instead.
+	 * This is useful when dealing with React and destructuring.
+	 */
+	macro public static inline function fastAsObject(args:Array<haxe.macro.Expr>):ExprOf<ClassNameDef> {
+		return FastMacro.fast([NullIfEmpty, AsObject], args);
+	}
+
+	public static function arrayToMap(arr:Array<String>):Dynamic<Bool> {
+		var map = {};
+
+		for (a in arr) Reflect.setField(map, a, true);
+
+		return map;
+	}
+
 #if !macro
 	#if js
 	static var hasOwnProperty;
@@ -86,31 +121,4 @@ class ClassNames {
 	}
 	#end
 #end
-
-	public static function arrayToMap(arr:Array<String>):Dynamic<Bool> {
-		var map = {};
-
-		for (a in arr) Reflect.setField(map, a, true);
-
-		return map;
-	}
-
-	/**
-	 * Macro implementation of classNames(), doing most of the work at compile-time.
-	 * Falls back to runtime code for objects it cannot handle (e.g. object as ref instead of inline).
-	 *
-	 * Since the npm version accepts pretty much anything as input, so does this version.
-	 * Accepted argument types are (mainly) String, Dynamic<String>, and [mixed] Arrays of these.
-	 */
-	macro public static inline function fast(args:Array<haxe.macro.Expr>):ExprOf<String> {
-		return FastMacro.fast([], args);
-	}
-
-	/**
-	 * Same as fast(), but will return null instead of an empty string.
-	 * This is useful when dealing with React, which will ignore the className attribute if null.
-	 */
-	macro public static inline function fastNull(args:Array<haxe.macro.Expr>):ExprOf<String> {
-		return FastMacro.fast([NullIfEmpty], args);
-	}
 }

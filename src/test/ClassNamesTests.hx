@@ -6,5 +6,7 @@ import test.suite.*;
 class ClassNamesTests implements Buddy<[
 	NpmIndexTests,
 	NpmDedupeTests,
-	FastReferencesTests
+	NpmBindTests,
+	FastReferencesTests,
+	AsObjectTests
 ]> {}

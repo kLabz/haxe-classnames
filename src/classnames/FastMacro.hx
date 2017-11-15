@@ -14,16 +14,18 @@ using haxe.macro.ComplexTypeTools;
 
 enum FastOption {
 	NullIfEmpty;
+	AsObject;
 	Bind(classMap:Dynamic<String>); // Can be an ExprOf<Dynamic<String>>
 }
 
 typedef FastOptions = {
 	?NullIfEmpty:Bool,
+	?AsObject:Bool,
 	?Bind:Dynamic<String>
 }
 
 enum ClassDefinition {
-	CompileTime(key:String, mappedKey:Null<String>, condition:ClassCondition);
+	CompileTime(key:String, condition:ClassCondition);
 	Runtime(ident:String);
 	RuntimeArray(ident:String);
 	Fallback(ident:String);
@@ -38,13 +40,14 @@ enum ClassCondition {
 class FastMacro {
 	/*
 		TODO: handle options
-		- bind for css modules
+		- Bind for css modules (how do we handle them in haxe?)
 			- Fully compile-time when possible
 			- "Semi compile-time" if contains runtime/fallback
 			- Runtime if map is a reference
 
 		TODO: misc
-		- error messages for invalid arguments
+		- Useful error messages for invalid arguments
+		- BEM helpers?
 	*/
 	public static function fast(opt:Array<FastOption>, args:Array<Expr>) {
 		var classes:Array<ClassDefinition> = [];
@@ -54,6 +57,7 @@ class FastMacro {
 			for (o in opt) {
 				switch (o) {
 					case NullIfEmpty: options.NullIfEmpty = true;
+					case AsObject: options.AsObject = true;
 					case Bind(classMap): options.Bind = classMap;
 				}
 			}
@@ -70,7 +74,7 @@ class FastMacro {
 			};
 		}) != null;
 
-		if (hasFallback) {
+		if (hasFallback || options.Bind != null) {
 			var maps = classesToMaps(classes, options, pos);
 
 			return switch (maps.length) {
@@ -78,10 +82,18 @@ class FastMacro {
 				returnVoid(options);
 
 				case 1:
-				macro classnames.ClassNames.fromMap(${maps[0]});
+				// TODO: pass bind map
+				if (options.AsObject)
+					macro {className: classnames.ClassNames.fromMap(${maps[0]})};
+				else
+					macro classnames.ClassNames.fromMap(${maps[0]});
 
 				default:
-				macro classnames.ClassNames.fromMaps([$a{maps}]);
+				// TODO: pass bind map
+				if (options.AsObject)
+					macro {className: classnames.ClassNames.fromMaps([$a{maps}])};
+				else
+					macro classnames.ClassNames.fromMaps([$a{maps}]);
 			};
 		} else {
 			var classesInfos = flattenClasses(classes, options, pos);
@@ -92,12 +104,17 @@ class FastMacro {
 				trimmedExpr = macro ${classesInfos.expr}.substr(1);
 			}
 
-			return macro ${trimmedExpr};
+			if (options.AsObject)
+				return macro {className: ${trimmedExpr}};
+			else
+				return macro ${trimmedExpr};
 		}
 	}
 
 	static function returnVoid(options:FastOptions):Expr {
-		if (options.NullIfEmpty) return macro null;
+		if (options.AsObject && options.NullIfEmpty) return macro {className: null};
+		else if (options.NullIfEmpty) return macro null;
+		else if (options.AsObject) return macro {className: ""};
 		else return macro "";
 	}
 
@@ -159,18 +176,14 @@ class FastMacro {
 			}
 
 			case EConst(CString("")):
-			#if classnames_fast_infos
-			Context.warning('[Info] ClassNames: empty class safely ignored', pos);
-			#end
+			// Ignored
 
 			case EConst(CString(s)):
 			for (c in ~/\s+/.split(s))
 				classes = appendClassExpr(classes, options, c, Hardcoded);
 
 			case EConst(CIdent(i)), EConst(CInt(i)) if (i == "true" || i == "false" || i == "0" || i == "null"):
-			#if classnames_fast_infos
-			Context.warning('[Info] ClassNames: class "$i" safely ignored', pos);
-			#end
+			// Ignored
 
 			case EConst(CInt(i)):
 			classes = appendClassExpr(classes, options, i, Hardcoded);
@@ -190,22 +203,24 @@ class FastMacro {
 				// Unsupported types
 
 				case TAnonymous(_):
-				Context.error('Reference to object should be of type Dynamic<Bool>', pos);
+				Context.error("Reference to object should be of type Dynamic<Bool>", pos);
 
 				case t if (isInstOf(t, "Int")):
-				Context.error('Reference to int not allowed. Use string instead?', pos);
+				Context.error("Reference to int not allowed. Use string instead?", pos);
 
 				case t if (isInstOf(t, "Bool")):
-				Context.error('Reference to boolean not allowed. Use string instead?', pos);
+				Context.error("Reference to boolean not allowed. Use string instead?", pos);
 
 				case TInst(arrInst, params) if (arrInst.toString() == "Array"):
-				Context.error('Reference to non-string Array not allowed. Use Array<String> instead?', pos);
+				Context.error("Reference to non-string Array not allowed. Use Array<String> instead?", pos);
 
 				case typed:
 				// TODO: explicit error message
+				#if classnames_fast_infos
 				trace(arg);
 				trace(typed);
-				Context.error('Unsupported argument (Econst(CIdent(i)))', pos);
+				#end
+				Context.error("Unsupported argument", pos);
 			}
 
 			case EArrayDecl(args):
@@ -217,8 +232,10 @@ class FastMacro {
 
 			default:
 			// TODO: explicit error message
+			#if classnames_fast_infos
 			trace(arg);
-			Context.error('Unsupported argument', pos);
+			#end
+			Context.error("Unsupported argument", pos);
 		}
 
 		return classes;
@@ -248,7 +265,7 @@ class FastMacro {
 
 		classes = classes.map(function(c) {
 			return switch(c) {
-				case CompileTime(prevKey, prevMappedKey, prevCondition) if (prevKey == key):
+				case CompileTime(prevKey, prevCondition) if (prevKey == key):
 				var newCondition = switch (prevCondition) {
 					case Hardcoded if (condition == Ignored): Ignored;
 					case Hardcoded: Hardcoded;
@@ -262,15 +279,14 @@ class FastMacro {
 					}
 				}
 				notFound = false;
-				CompileTime(prevKey, prevMappedKey, newCondition);
+				CompileTime(prevKey, newCondition);
 
 				default: c;
 			};
 		});
 
 		if (notFound) {
-			var mappedKey = options.Bind != null ? getMappedKey(options.Bind, key) : null;
-			classes.push(CompileTime(key, mappedKey == null ? key : mappedKey, condition));
+			classes.push(CompileTime(key, condition));
 		}
 
 		return classes;
@@ -311,10 +327,10 @@ class FastMacro {
 
 		var expr:Expr = Lambda.fold(classes, function(cdef, expr) {
 			return switch (cdef) {
-				case CompileTime(key, mappedKey, condition):
+				case CompileTime(key, condition):
 				switch (condition) {
 					case Hardcoded:
-					concatExprs(expr, macro $v{mappedKey}, pos);
+					concatExprs(expr, macro $v{key}, pos);
 
 					case Ignored:
 					expr;
@@ -392,16 +408,16 @@ class FastMacro {
 
 		for (cdef in classes) {
 			switch (cdef) {
-				case CompileTime(key, mappedKey, condition):
+				case CompileTime(key, condition):
 				switch (condition) {
 					case Hardcoded:
-					currentMap.push({field: mappedKey, expr: macro true});
+					currentMap.push({field: key, expr: macro true});
 
 					case Ignored:
-					if (hasRuntimeOrFallback) currentMap.push({field: mappedKey, expr: macro false});
+					if (hasRuntimeOrFallback) currentMap.push({field: key, expr: macro false});
 
 					case Runtime(runtimeExpr):
-					currentMap.push({field: mappedKey, expr: runtimeExpr});
+					currentMap.push({field: key, expr: runtimeExpr});
 				}
 
 				case Runtime(ident):
