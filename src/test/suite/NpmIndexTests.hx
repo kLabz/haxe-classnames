@@ -85,7 +85,7 @@ class NpmIndexTests extends SingleSuite {
 					negativeZero: -0,
 					"false": false,
 
-					// truthy (literally anything else):
+					// truthy:
 					nonEmptyString: "foobar",
 					whitespace: " ",
 					"function": NpmIndexTests.testFunction,
@@ -175,7 +175,7 @@ class NpmIndexTests extends SingleSuite {
 					negativeZero: -0,
 					"false": false,
 
-					// truthy (literally anything else):
+					// truthy:
 					nonEmptyString: "foobar",
 					whitespace: " ",
 					"function": NpmIndexTests.testFunction,
@@ -265,7 +265,7 @@ class NpmIndexTests extends SingleSuite {
 					negativeZero: -0,
 					"false": false,
 
-					// truthy (literally anything else):
+					// truthy:
 					nonEmptyString: "foobar",
 					whitespace: " ",
 					"function": NpmIndexTests.testFunction,
