@@ -2,6 +2,7 @@
 -main test.ClassNamesTests
 
 -cp src
+-cp test/src
 -lib buddy
 
 -D nodejs
