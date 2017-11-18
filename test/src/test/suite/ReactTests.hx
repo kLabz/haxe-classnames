@@ -32,7 +32,7 @@ class ReactTests extends SingleSuite {
 
 				wrapper.find("div").should.haveClassName("base a b c disabled");
 
-				var wrapper = mount(jsx('
+				wrapper = mount(jsx('
 					<$Bar
 						className="d"
 						checked=$true
@@ -40,6 +40,15 @@ class ReactTests extends SingleSuite {
 				'));
 
 				wrapper.find("div").should.haveClassName("base d checked");
+
+				wrapper = mount(jsx('
+					<$Bar
+						className="checked"
+						disabled=$true
+					/>
+				'));
+
+				wrapper.find("div").should.haveClassName("base disabled");
 			});
 
 			// TODO: more tests

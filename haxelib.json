@@ -1,14 +1,11 @@
 {
   "name": "classnames",
-  "description": "TODO.",
-  "version": "0.0.0",
-  "releasenote": "TODO. (See CHANGELOG.md)",
+  "description": "Haxe utility for conditionally joining classNames together.",
+  "version": "0.1.0",
+  "releasenote": "Initial release. (See CHANGELOG.md)",
   "url": "https://github.com/kLabz/haxe-classnames",
   "license": "MIT",
-  "tags": [
-    "javascript",
-    "redux"
-  ],
+  "tags": [],
   "classPath": "src",
   "contributors": [
     "klabz"

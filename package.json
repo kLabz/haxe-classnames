@@ -1,10 +1,9 @@
 {
   "name": "haxe-classnames",
-  "version": "0.0.0",
-  "description": "TODO.",
+  "version": "0.1.0",
+  "description": "Haxe utility for conditionally joining classNames together.",
   "keywords": [
-    "haxe",
-    "redux"
+    "haxe"
   ],
   "repository": {
     "type": "git",
@@ -21,7 +20,7 @@
   },
   "scripts": {
     "test": "haxe test.hxml && node bin/test.js",
-    "test:react": "haxe test-react.hxml && node bin/test-react.js"
+    "test:including-react": "haxe test-react.hxml && node bin/test-react.js"
   },
   "devDependencies": {
     "enzyme": "^3.0.0",
