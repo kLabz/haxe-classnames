@@ -20,9 +20,17 @@
     "url": "https://github.com/kLabz"
   },
   "scripts": {
-    "test": "haxe test.hxml && node bin/test.js"
+    "test": "haxe test.hxml && node bin/test.js",
+    "test:react": "haxe test-react.hxml && node bin/test-react.js"
   },
-  "dependencies": {
+  "devDependencies": {
+    "enzyme": "^3.0.0",
+    "enzyme-adapter-react-16": "^1.0.0",
+    "jsdom": "^11.3.0",
+    "prop-types": "^15.6.0",
+    "react": "^16.0.0",
+    "react-dom": "^16.0.0",
+    "react-test-renderer": "^16.0.0",
     "classnames": "^2.2.5"
   }
 }

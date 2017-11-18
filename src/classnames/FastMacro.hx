@@ -26,15 +26,15 @@ typedef FastOptions = {
 
 enum ClassDefinition {
 	CompileTime(key:String, condition:ClassCondition);
-	Runtime(ident:String);
-	RuntimeArray(ident:String);
-	Fallback(ident:String);
+	Runtime(expr:Expr);
+	RuntimeArray(expr:Expr);
+	Fallback(expr:Expr);
 }
 
 enum ClassCondition {
 	Hardcoded;
 	Ignored;
-	Runtime(expr:Expr);
+	Runtime(checkExpr:Expr, runtimeExpr:Expr);
 }
 
 class FastMacro {
@@ -75,9 +75,10 @@ class FastMacro {
 		}) != null;
 
 		if (hasFallback || options.Bind != null) {
-			var maps = classesToMaps(classes, options, pos);
+			var exprs = classesToMaps(classes, options, pos);
+			var maps = exprs.maps;
 
-			return switch (maps.length) {
+			var retExpr = switch (maps.length) {
 				case 0:
 				returnVoid(options);
 
@@ -95,6 +96,15 @@ class FastMacro {
 				else
 					macro classnames.ClassNames.fromMaps([$a{maps}]);
 			};
+
+			if (exprs.head.length > 0)
+				return macro {
+					$a{exprs.head};
+					${retExpr};
+				};
+			else
+				return retExpr;
+
 		} else {
 			var classesInfos = flattenClasses(classes, options, pos);
 			if (classesInfos.expr == null) return returnVoid(options);
@@ -104,10 +114,17 @@ class FastMacro {
 				trimmedExpr = macro ${classesInfos.expr}.substr(1);
 			}
 
-			if (options.AsObject)
-				return macro {className: ${trimmedExpr}};
+			var retExpr= options.AsObject
+				? macro {className: ${trimmedExpr}}
+				: macro ${trimmedExpr};
+
+			if (classesInfos.head.length > 0)
+				return macro {
+					$a{classesInfos.head};
+					${retExpr};
+				};
 			else
-				return macro ${trimmedExpr};
+				return retExpr;
 		}
 	}
 
@@ -163,14 +180,9 @@ class FastMacro {
 							throw "Fallback to runtime";
 						}
 					} catch(e:Dynamic) {
-						var clsExpr = macro {
-							// Ensure haxe compiler checks this expression, but let dce remove this line
-							${f.expr};
-
-							// Real check
-							((untyped ${f.expr}) ? $v{fname} : "");
-						};
-						classes = appendClassExpr(classes, options, fieldName, Runtime(clsExpr));
+						var c = macro ${f.expr};
+						var f = macro $v{fname};
+						classes = appendClassExpr(classes, options, fieldName, Runtime(c, f));
 					}
 				}
 			}
@@ -188,17 +200,29 @@ class FastMacro {
 			case EConst(CInt(i)):
 			classes = appendClassExpr(classes, options, i, Hardcoded);
 
-			case EConst(CIdent(i)):
+			case EArrayDecl(args):
+			for (arg in args) classes = parseFastArg(arg, classes, options);
+
+			case EBlock([]):
+			// Ignored
+
+			case EParenthesis(e):
+			return parseFastArg(e, classes, options);
+
+			case EUntyped(_):
+			Context.error("Use of untyped is not allowed here", pos);
+
+			default:
 			switch (Context.typeExpr(arg).t) {
 				case t if (isDynamicBool(t)):
-				appendFallback(classes, i);
+				appendFallback(classes, arg);
 
 				case t if (isInstOf(t, "String")):
-				appendRuntime(classes, i);
+				appendRuntime(classes, arg);
 
 				case TInst(arrInst, [TInst(strInst, [])])
 				if (arrInst.toString() == "Array" && strInst.toString() == "String"):
-				appendRuntimeArray(classes, i);
+				appendRuntimeArray(classes, arg);
 
 				// Unsupported types
 
@@ -215,27 +239,12 @@ class FastMacro {
 				Context.error("Reference to non-string Array not allowed. Use Array<String> instead?", pos);
 
 				case typed:
-				// TODO: explicit error message
 				#if classnames_fast_infos
 				trace(arg);
 				trace(typed);
 				#end
 				Context.error("Unsupported argument", pos);
 			}
-
-			case EArrayDecl(args):
-			for (arg in args) classes = parseFastArg(arg, classes, options);
-
-			// Ignored expressions
-			case EBlock([]):
-			// Nothing to do
-
-			default:
-			// TODO: explicit error message
-			#if classnames_fast_infos
-			trace(arg);
-			#end
-			Context.error("Unsupported argument", pos);
 		}
 
 		return classes;
@@ -272,7 +281,7 @@ class FastMacro {
 
 					case Ignored: condition;
 
-					case Runtime(expr):
+					case Runtime(checkExpr, runtimeExpr):
 					switch (condition) {
 						case Runtime(_): condition;
 						default: prevCondition;
@@ -294,23 +303,23 @@ class FastMacro {
 
 	static function appendFallback(
 		classes:Array<ClassDefinition>,
-		ident:String
+		expr:Expr
 	):Void {
-		classes.push(Fallback(ident));
+		classes.push(Fallback(expr));
 	}
 
 	static function appendRuntime(
 		classes:Array<ClassDefinition>,
-		ident:String
+		expr:Expr
 	):Void {
-		classes.push(Runtime(ident));
+		classes.push(Runtime(expr));
 	}
 
 	static function appendRuntimeArray(
 		classes:Array<ClassDefinition>,
-		ident:String
+		expr:Expr
 	):Void {
-		classes.push(RuntimeArray(ident));
+		classes.push(RuntimeArray(expr));
 	}
 
 	static function getMappedKey(map:Dynamic<String>, key:String):Null<String> {
@@ -322,8 +331,9 @@ class FastMacro {
 		classes:Array<ClassDefinition>,
 		options:FastOptions,
 		pos:Position
-	):{expr:Expr, needsTrim:Bool} {
+	):{expr:Expr, head:Null<Array<Expr>>, needsTrim:Bool} {
 		var needsTrim = false;
+		var head:Array<Expr> = [];
 
 		var expr:Expr = Lambda.fold(classes, function(cdef, expr) {
 			return switch (cdef) {
@@ -335,33 +345,34 @@ class FastMacro {
 					case Ignored:
 					expr;
 
-					case Runtime(runtimeExpr):
+					case Runtime(checkExpr, runtimeExpr):
+					head.push(checkExpr);
 					if (expr == null) needsTrim = true;
-					concatExprs(expr, runtimeExpr, pos);
+					concatExprs(expr, macro ((untyped ${checkExpr}) ? ${runtimeExpr} : ""), pos);
 				}
 
-				case Runtime(ident):
+				case Runtime(runtimeExpr):
 				if (expr == null) needsTrim = true;
-				concatExprs(expr, macro " " + $i{ident}, pos);
+				concatExprs(expr, macro " " + ${runtimeExpr}, pos);
 
-				case RuntimeArray(ident):
+				case RuntimeArray(runtimeExpr):
 				if (expr == null) needsTrim = true;
-				concatExprs(expr, macro " " + $i{ident}.join(" "), pos);
+				concatExprs(expr, macro " " + ${runtimeExpr}.join(" "), pos);
 
-				case Fallback(ident):
+				case Fallback(fallbackExpr):
 				if (expr == null) needsTrim = true;
 				concatExprs(
 					expr,
 					macro {
 						var a:String;
-						((untyped (a = classnames.ClassNames.fromMap($i{ident}))) ? " " + a : "");
+						((untyped (a = classnames.ClassNames.fromMap(${fallbackExpr}))) ? " " + a : "");
 					},
 					pos
 				);
 			};
 		}, null);
 
-		return {expr: expr, needsTrim: needsTrim};
+		return {expr: expr, head: head, needsTrim: needsTrim};
 	}
 
 	static function concatExprs(prevExpr:Expr, newExpr:Expr, pos:Position):Expr {
@@ -401,8 +412,9 @@ class FastMacro {
 		classes:Array<ClassDefinition>,
 		options:FastOptions,
 		pos:Position
-	):Array<Expr> {
+	):{head: Array<Expr>, maps: Array<Expr>} {
 		var maps = [];
+		var head = [];
 		var currentMap:Array<{field:String, expr:Expr}> = [];
 		var hasRuntimeOrFallback = false;
 
@@ -416,30 +428,31 @@ class FastMacro {
 					case Ignored:
 					if (hasRuntimeOrFallback) currentMap.push({field: key, expr: macro false});
 
-					case Runtime(runtimeExpr):
-					currentMap.push({field: key, expr: runtimeExpr});
+					case Runtime(checkExpr, runtimeExpr):
+					head.push(checkExpr);
+					currentMap.push({field: key, expr: macro untyped ${checkExpr}});
 				}
 
-				case Runtime(ident):
+				case Runtime(expr):
 				closeMap(maps, currentMap, pos);
 				maps.push(macro {
 					var a = {};
-					for (f in ~/\s+/.split($i{ident})) Reflect.setField(a, f, true);
+					for (f in ~/\s+/.split(${expr})) Reflect.setField(a, f, true);
 					a;
 				});
 				currentMap = [];
 				hasRuntimeOrFallback = true;
 
-				case RuntimeArray(ident):
+				case RuntimeArray(expr):
 				closeMap(maps, currentMap, pos);
-				maps.push(macro classnames.ClassNames.arrayToMap($i{ident}));
+				maps.push(macro classnames.ClassNames.arrayToMap(${expr}));
 				currentMap = [];
 				hasRuntimeOrFallback = true;
 				hasRuntimeOrFallback = true;
 
-				case Fallback(ident):
+				case Fallback(expr):
 				closeMap(maps, currentMap, pos);
-				maps.push(macro $i{ident});
+				maps.push(macro ${expr});
 				currentMap = [];
 				hasRuntimeOrFallback = true;
 			}
@@ -447,7 +460,7 @@ class FastMacro {
 
 		closeMap(maps, currentMap, pos);
 
-		return maps;
+		return {head: head, maps: maps};
 	}
 
 	static function closeMap(

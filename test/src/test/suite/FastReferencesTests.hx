@@ -78,6 +78,160 @@ class FastReferencesTests extends SingleSuite {
 
 				ClassNames.fast(ab, cd).should.be("a b c d");
 			});
+
+			it("EField", function () {
+				var abc = "a b c";
+				var props = {disabled: true, checked: true, className: abc};
+
+				var res = ClassNames.fast(
+					"base",
+					props.className,
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				res.should.be("base a b c disabled");
+
+				var resObj = ClassNames.fastAsObject(
+					"base",
+					props.className,
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				resObj.className.should.be("base a b c disabled");
+			});
+
+			it("EParenthesis", function () {
+				var abc = "a b c";
+				var props = {disabled: true, checked: true, className: abc};
+
+				var res = ClassNames.fast(
+					("base"),
+					(props.className),
+					{
+						disabled: (props.disabled),
+						checked: (!props.disabled && props.checked)
+					}
+				);
+				res.should.be("base a b c disabled");
+
+				var resObj = ClassNames.fastAsObject(
+					("base"),
+					(props.className),
+					{
+						disabled: (props.disabled),
+						checked: (!props.disabled && props.checked)
+					}
+				);
+				resObj.className.should.be("base a b c disabled");
+			});
+
+			it("ENew", function () {
+				var abc = "a b c";
+				var props = {disabled: true, checked: true, className: new String(abc)};
+
+				var res = ClassNames.fast(
+					new String("base"),
+					(props.className),
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				res.should.be("base a b c disabled");
+
+				var resObj = ClassNames.fastAsObject(
+					new String("base"),
+					(props.className),
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				resObj.className.should.be("base a b c disabled");
+			});
+
+			it("ESwitch", function () {
+				var abc = "a b c";
+				var props = {disabled: true, checked: true, className: new String(abc)};
+
+				var res = ClassNames.fast(
+					switch(true) {
+						case true: "base";
+						case false: "null";
+					},
+					(props.className),
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				res.should.be("base a b c disabled");
+
+				var resObj = ClassNames.fastAsObject(
+					switch(true) {
+						case true: "base";
+						case false: "null";
+					},
+					(props.className),
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				resObj.className.should.be("base a b c disabled");
+			});
+
+			it("EUnop / String concatenation", function () {
+				var props = {disabled: true, checked: true, className: "a b c"};
+
+				var res = ClassNames.fast(
+					"ba" + "se",
+					(props.className),
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				res.should.be("base a b c disabled");
+
+				var resObj = ClassNames.fastAsObject(
+					"ba" + "se",
+					(props.className),
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				resObj.className.should.be("base a b c disabled");
+			});
+
+			it("ECall / Array join", function () {
+				var props = {disabled: true, checked: true, className: "a b c"};
+
+				var res = ClassNames.fast(
+					["ba", "se"].join(""),
+					(props.className),
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				res.should.be("base a b c disabled");
+
+				var resObj = ClassNames.fastAsObject(
+					["ba", "se"].join(""),
+					(props.className),
+					{
+						disabled: props.disabled,
+						checked: !props.disabled && props.checked
+					}
+				);
+				resObj.className.should.be("base a b c disabled");
+			});
 		});
 	}
 }

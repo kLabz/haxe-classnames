@@ -7,6 +7,9 @@ class ClassNamesTests implements Buddy<[
 	NpmIndexTests,
 	NpmDedupeTests,
 	NpmBindTests,
+	#if react
+	ReactTests,
+	#end
 	FastReferencesTests,
 	AsObjectTests
 ]> {}
