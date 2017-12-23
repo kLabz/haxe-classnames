@@ -1,6 +1,6 @@
 {
   "name": "haxe-classnames",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Haxe utility for conditionally joining classNames together.",
   "keywords": [
     "haxe"

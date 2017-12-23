@@ -1,8 +1,8 @@
 {
   "name": "classnames",
   "description": "Haxe utility for conditionally joining classNames together.",
-  "version": "0.1.0",
-  "releasenote": "Initial release. (See CHANGELOG.md)",
+  "version": "0.1.1",
+  "releasenote": "Avoid buddy dependency outside tests (See CHANGELOG.md)",
   "url": "https://github.com/kLabz/haxe-classnames",
   "license": "MIT",
   "tags": [],

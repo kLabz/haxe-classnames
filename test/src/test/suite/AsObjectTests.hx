@@ -4,7 +4,7 @@ import buddy.SingleSuite;
 import classnames.ClassNames;
 import test.JSClassNames.JSClassNamesDedupe;
 
-using classnames.ClassNameDef.ShouldClassNameDef;
+using classnames.ShouldClassNameDef;
 
 class AsObjectTests extends SingleSuite {
 	public function new() {
