@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 (2018-05-07)
+
+* Haxe 4 compatibility
+
 ## 0.1.1 (2017-12-23)
 
 * Moved ShouldClassNameDef to avoid buddy dependency outside tests

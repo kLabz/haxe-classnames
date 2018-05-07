@@ -12,6 +12,10 @@ import haxe.macro.TypeTools;
 using StringTools;
 using haxe.macro.ComplexTypeTools;
 
+#if (haxe_ver < 4)
+typedef ObjectField = {field:String, expr:Expr};
+#end
+
 enum FastOption {
 	NullIfEmpty;
 	AsObject;
@@ -160,8 +164,15 @@ class FastMacro {
 					try {
 						var value:Dynamic = ExprTools.getValue(f.expr);
 
+						// Workaround for haxe 4 rc2 and rc3, awaiting next release
+						if (value == 0) {
+							classes = appendClassExpr(classes, options, fieldName, Ignored);
+							continue;
+						}
+
 						switch (value) {
-							case false, 0, "", null:
+							// case false, 0, "", null: // Doesn't work in haxe 4 rc2 and rc3, fixed in dev builds
+							case false, "", null:
 							classes = appendClassExpr(classes, options, fieldName, Ignored);
 
 							case true:
@@ -252,6 +263,8 @@ class FastMacro {
 
 	static function isInstOf(type:Type, of:String):Bool {
 		return switch(type) {
+			case TType(_.get() => {name: "Null", pack: []}, [TInst(a, _)]) if (a.toString() == of): true;
+			case TType(_.get() => {name: "Null", pack: []}, [TAbstract(a, _)]) if (a.toString() == of): true;
 			case TInst(a, _) if (a.toString() == of): true;
 			case TAbstract(a, _) if (a.toString() == of): true;
 			default: false;
@@ -415,7 +428,7 @@ class FastMacro {
 	):{head: Array<Expr>, maps: Array<Expr>} {
 		var maps = [];
 		var head = [];
-		var currentMap:Array<{field:String, expr:Expr}> = [];
+		var currentMap:Array<ObjectField> = [];
 		var hasRuntimeOrFallback = false;
 
 		for (cdef in classes) {
@@ -465,7 +478,7 @@ class FastMacro {
 
 	static function closeMap(
 		maps:Array<Expr>,
-		currentMap:Array<{field:String, expr:Expr}>,
+		currentMap:Array<ObjectField>,
 		pos:Position
 	):Void {
 		if (currentMap.length > 0) {
