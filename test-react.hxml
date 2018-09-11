@@ -1,4 +1,4 @@
--js bin/test-react.js
+-js .build/test-react.js
 -main test.ClassNamesTests
 
 -cp src
