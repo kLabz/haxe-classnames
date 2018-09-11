@@ -11,5 +11,6 @@ class ClassNamesTests implements Buddy<[
 	ReactTests,
 	#end
 	FastReferencesTests,
+	StringInterpolationTests,
 	AsObjectTests
 ]> {}

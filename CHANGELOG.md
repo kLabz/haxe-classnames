@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 (2018-09-11)
+
+* Some fixes for string interpolation in fast(EObjectDecl)
+
 ## 0.1.3 (2018-09-11)
 
 * Allow string interpolation in fast(EObjectDecl) keys
