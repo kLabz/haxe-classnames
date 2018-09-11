@@ -1,0 +1,19 @@
+language: haxe
+
+haxe:
+  - stable
+  - 4.0.0-preview.4
+  - development
+
+matrix:
+  allow_failures:
+    - haxe: development
+
+install:
+  - npm install
+  - haxelib install buddy
+  - haxelib install enzyme
+  - haxelib git react https://github.com/massiveinteractive/haxe-react 536530a4
+
+script:
+  - npm run test:including-react
