@@ -30,7 +30,7 @@ typedef FastOptions = {
 }
 
 enum ClassDefinition {
-	CompileTime(key:String, condition:ClassCondition);
+	CompileTime(key:String, keyExpr:Expr, condition:ClassCondition);
 	Runtime(expr:Expr);
 	RuntimeArray(expr:Expr);
 	Fallback(expr:Expr);
@@ -152,14 +152,14 @@ class FastMacro {
 			for (f in fields) {
 				var fieldName = f.field;
 				if (fieldName.startsWith("@$__hx__")) fieldName = fieldName.substr(8);
-				var fname = MacroStringTools.formatString(' ' + fieldName, f.expr.pos);
+				var fname:Expr = MacroStringTools.formatString(' ' + fieldName, f.expr.pos);
 
 				switch (f.expr.expr) {
 					case EConst(CIdent("false")):
-					classes = appendClassExpr(classes, options, fieldName, Ignored);
+					classes = appendClassExpr(classes, options, fieldName, fname, Ignored);
 
 					case EConst(CIdent("true")), EObjectDecl(_), EArrayDecl(_), EBlock([]):
-					classes = appendClassExpr(classes, options, fieldName, Hardcoded);
+					classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
 
 					default:
 					try {
@@ -167,34 +167,33 @@ class FastMacro {
 
 						// Workaround for haxe 4 rc2 and rc3, awaiting next release
 						if (value == 0) {
-							classes = appendClassExpr(classes, options, fieldName, Ignored);
+							classes = appendClassExpr(classes, options, fieldName, fname, Ignored);
 							continue;
 						}
 
 						switch (value) {
 							// case false, 0, "", null: // Doesn't work in haxe 4 rc2 and rc3, fixed in dev builds
 							case false, "", null:
-							classes = appendClassExpr(classes, options, fieldName, Ignored);
+							classes = appendClassExpr(classes, options, fieldName, fname, Ignored);
 
 							case true:
-							classes = appendClassExpr(classes, options, fieldName, Hardcoded);
+							classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
 
 							case s if (Std.is(s, String)):
-							classes = appendClassExpr(classes, options, fieldName, Hardcoded);
+							classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
 
 							case i if (Std.is(i, Int) && i != 0):
-							classes = appendClassExpr(classes, options, fieldName, Hardcoded);
+							classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
 
 							case f if (Std.is(f, Float) && f != 0):
-							classes = appendClassExpr(classes, options, fieldName, Hardcoded);
+							classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
 
 							default:
 							throw "Fallback to runtime";
 						}
 					} catch(e:Dynamic) {
 						var c = macro ${f.expr};
-						var f = fname;
-						classes = appendClassExpr(classes, options, fieldName, Runtime(c, f));
+						classes = appendClassExpr(classes, options, fieldName, fname, Runtime(c, fname));
 					}
 				}
 			}
@@ -204,13 +203,13 @@ class FastMacro {
 
 			case EConst(CString(s)):
 			for (c in ~/\s+/.split(s))
-				classes = appendClassExpr(classes, options, c, Hardcoded);
+				classes = appendClassExpr(classes, options, c, macro $v{c}, Hardcoded);
 
 			case EConst(CIdent(i)), EConst(CInt(i)) if (i == "true" || i == "false" || i == "0" || i == "null"):
 			// Ignored
 
 			case EConst(CInt(i)):
-			classes = appendClassExpr(classes, options, i, Hardcoded);
+			classes = appendClassExpr(classes, options, i, macro $v{i}, Hardcoded);
 
 			case EArrayDecl(args):
 			for (arg in args) classes = parseFastArg(arg, classes, options);
@@ -282,13 +281,14 @@ class FastMacro {
 		classes:Array<ClassDefinition>,
 		options:FastOptions,
 		key:String,
+		keyExpr:Expr,
 		condition:ClassCondition
 	):Array<ClassDefinition> {
 		var notFound = true;
 
 		classes = classes.map(function(c) {
 			return switch(c) {
-				case CompileTime(prevKey, prevCondition) if (prevKey == key):
+				case CompileTime(prevKey, prevKeyExpr, prevCondition) if (prevKey == key):
 				var newCondition = switch (prevCondition) {
 					case Hardcoded if (condition == Ignored): Ignored;
 					case Hardcoded: Hardcoded;
@@ -302,14 +302,14 @@ class FastMacro {
 					}
 				}
 				notFound = false;
-				CompileTime(prevKey, newCondition);
+				CompileTime(prevKey, prevKeyExpr, newCondition);
 
 				default: c;
 			};
 		});
 
 		if (notFound) {
-			classes.push(CompileTime(key, condition));
+			classes.push(CompileTime(key, keyExpr, condition));
 		}
 
 		return classes;
@@ -351,10 +351,10 @@ class FastMacro {
 
 		var expr:Expr = Lambda.fold(classes, function(cdef, expr) {
 			return switch (cdef) {
-				case CompileTime(key, condition):
+				case CompileTime(key, keyExpr, condition):
 				switch (condition) {
 					case Hardcoded:
-					concatExprs(expr, macro $v{key}, pos);
+					concatExprs(expr, keyExpr, pos);
 
 					case Ignored:
 					expr;
@@ -397,16 +397,22 @@ class FastMacro {
 					case EBinop(OpAdd, left, right):
 					switch (right.expr) {
 						case EConst(CString(rightStr)):
+						// rightStr = StringTools.trim(rightStr);
+						newStr = StringTools.trim(newStr);
 						return makeBinAdd(left, {expr: EConst(CString(rightStr + " " + newStr)), pos: pos}, pos);
 
 						default:
+						newStr = StringTools.trim(newStr);
 						newExpr = {expr: EConst(CString(" " + newStr)), pos: pos};
 					}
 
 					case EConst(CString(prevStr)):
+					prevStr = StringTools.trim(prevStr);
+					newStr = StringTools.trim(newStr);
 					return {expr: EConst(CString(prevStr + " " + newStr)), pos: pos};
 
 					default:
+					newStr = StringTools.trim(newStr);
 					newExpr = {expr: EConst(CString(" " + newStr)), pos: pos};
 				}
 
@@ -434,7 +440,7 @@ class FastMacro {
 
 		for (cdef in classes) {
 			switch (cdef) {
-				case CompileTime(key, condition):
+				case CompileTime(key, keyExpr, condition):
 				switch (condition) {
 					case Hardcoded:
 					currentMap.push({field: key, expr: macro true});
