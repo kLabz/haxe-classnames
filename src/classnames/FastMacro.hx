@@ -6,6 +6,7 @@ import haxe.macro.Context;
 import haxe.macro.Expr;
 import haxe.macro.ExprTools;
 import haxe.macro.PositionTools;
+import haxe.macro.MacroStringTools;
 import haxe.macro.Type;
 import haxe.macro.TypeTools;
 
@@ -151,7 +152,7 @@ class FastMacro {
 			for (f in fields) {
 				var fieldName = f.field;
 				if (fieldName.startsWith("@$__hx__")) fieldName = fieldName.substr(8);
-				var fname = ' $fieldName';
+				var fname = MacroStringTools.formatString(' ' + fieldName, f.expr.pos);
 
 				switch (f.expr.expr) {
 					case EConst(CIdent("false")):
@@ -192,7 +193,7 @@ class FastMacro {
 						}
 					} catch(e:Dynamic) {
 						var c = macro ${f.expr};
-						var f = macro $v{fname};
+						var f = fname;
 						classes = appendClassExpr(classes, options, fieldName, Runtime(c, f));
 					}
 				}
