@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 (2018-10-16)
+
+* Fix for haxe 4 preview 5
+
 ## 0.1.4 (2018-09-11)
 
 * Some fixes for string interpolation in fast(EObjectDecl)

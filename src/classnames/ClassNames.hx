@@ -38,7 +38,7 @@ class ClassNames {
 
 #if !macro
 	#if js
-	static var hasOwnProperty;
+	static var hasOwnProperty:String->Bool;
 
 	public static function fromMaps(
 		classMaps:Array<Dynamic<Bool>>,

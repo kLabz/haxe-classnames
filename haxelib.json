@@ -1,8 +1,8 @@
 {
   "name": "classnames",
   "description": "Haxe utility for conditionally joining classNames together.",
-  "version": "0.1.4",
-  "releasenote": "Allow string interpolation in fast(obj) keys (See CHANGELOG.md)",
+  "version": "0.1.5",
+  "releasenote": "Fix for haxe 4 preview 5. (See CHANGELOG.md)",
   "url": "https://github.com/kLabz/haxe-classnames",
   "license": "MIT",
   "tags": [],
