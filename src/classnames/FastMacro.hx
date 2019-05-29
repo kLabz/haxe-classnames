@@ -229,7 +229,7 @@ class FastMacro {
 				appendFallback(classes, arg);
 
 				case t if (isInstOf(t, "String")):
-				appendRuntime(classes, arg);
+				appendRuntime(classes, macro $e{arg} == null ? "" : $e{arg});
 
 				case TInst(arrInst, [TInst(strInst, [])])
 				if (arrInst.toString() == "Array" && strInst.toString() == "String"):
@@ -267,6 +267,7 @@ class FastMacro {
 			case TType(_.get() => {name: "Null", pack: []}, [TAbstract(a, _)]) if (a.toString() == of): true;
 			case TInst(a, _) if (a.toString() == of): true;
 			case TAbstract(a, _) if (a.toString() == of): true;
+			case TAbstract(_.toString() => "Null", [t]): isInstOf(t, of);
 			default: false;
 		};
 	}

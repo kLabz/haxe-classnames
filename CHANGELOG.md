@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 (2019-05-29)
+
+* Allow `Null<String>` variables as fast() argument
+* Add runtime nullcheck for string variables
+
 ## 0.1.5 (2018-10-16)
 
 * Fix for haxe 4 preview 5
