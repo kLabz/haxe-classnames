@@ -1,5 +1,9 @@
 package classnames;
 
+#if (!macro && js)
+import js.Syntax;
+#end
+
 class ClassNames {
 	/**
 	 * Macro implementation of classNames(), doing most of the work at compile-time.
@@ -47,15 +51,15 @@ class ClassNames {
 		var o = {};
 
 		if (hasOwnProperty == null)
-			hasOwnProperty = untyped __js__('Object').prototype.hasOwnProperty;
+			hasOwnProperty = Syntax.code('Object').prototype.hasOwnProperty;
 
 		for (classMap in classMaps) untyped {
-			__js__("for (var k in classMap) {");
+			Syntax.code("for (var k in classMap) {");
 				if (hasOwnProperty.call(classMap, k)) {
 					var val = classMap[k];
 					Reflect.setField(o, k, val);
 				}
-			__js__("}");
+			Syntax.code("}");
 		}
 
 		return fromMap(o, nullIfEmpty);
@@ -69,17 +73,17 @@ class ClassNames {
 		var hasClassNames = false;
 
 		if (hasOwnProperty == null)
-			hasOwnProperty = untyped __js__('Object').prototype.hasOwnProperty;
+			hasOwnProperty = Syntax.code('Object').prototype.hasOwnProperty;
 
 		untyped {
-			__js__("for (var k in classMap) {");
+			Syntax.code("for (var k in classMap) {");
 				if (hasOwnProperty.call(classMap, k)) {
 					if (classMap[k]) {
 						classNames.push(k);
 						hasClassNames = true;
 					}
 				}
-			__js__("}");
+			Syntax.code("}");
 		};
 
 		if (hasClassNames) return classNames.join(" ");
