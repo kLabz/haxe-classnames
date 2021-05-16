@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 (2021-05-16)
+
+* Fix Haxe 4 deprecation warnings
+* No longer compatible with Haxe < 4; let me know if you need it
+
 ## 0.1.6 (2019-05-29)
 
 * Allow `Null<String>` variables as fast() argument
