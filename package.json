@@ -21,7 +21,7 @@
   "scripts": {
     "postinstall": "haxelib newrepo",
     "test": "haxe test.hxml && node .build/test.js",
-    "test:including-react": "haxe test-react.hxml && node .build/test-react.js"
+    "test:react": "haxe test-react.hxml && node .build/test-react.js"
   },
   "devDependencies": {
     "enzyme": "^3.0.0",
