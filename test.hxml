@@ -4,6 +4,7 @@
 -cp src
 -cp test/src
 -lib buddy
+-lib hxnodejs
 
 -D nodejs
 -D buddy-colors

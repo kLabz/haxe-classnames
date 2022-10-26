@@ -5,13 +5,12 @@
 -cp test/src
 -lib buddy
 -lib enzyme
+-lib hxnodejs
 -lib react
+# -lib react-next
 
 -D nodejs
 -D buddy-colors
 -D reporter=buddy.reporting.ConsoleColorReporter
 
 -D classnames_fast_infos
-
-# Temporary bugfix for react 16 (waiting for haxe-react 1.2.2+)
--D react_monomorphic
