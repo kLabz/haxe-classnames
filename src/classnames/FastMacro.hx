@@ -72,16 +72,25 @@ class FastMacro {
 		if (classes.length == 0) returnVoid(options);
 
 		var pos = Context.currentPos();
+
+		var hasRuntimeCheck = Lambda.find(classes, function(c) {
+			return switch (c) {
+				case CompileTime(_, _, Ignored | Runtime(_, _)): true;
+				case RuntimeArray(_): true;
+				default: false;
+			};
+		}) != null;
+
 		var hasFallback = Lambda.find(classes, function(c) {
 			return switch (c) {
-				case Fallback(_), Runtime(_): true;
+				case Fallback(_): true;
+				case Runtime(_): hasRuntimeCheck;
 				default: false;
 			};
 		}) != null;
 
 		if (hasFallback || options.Bind != null) {
-			var exprs = classesToMaps(classes, options, pos);
-			var maps = exprs.maps;
+			var maps = classesToMaps(classes, options, pos);
 
 			var retExpr = switch (maps.length) {
 				case 0:
@@ -102,35 +111,28 @@ class FastMacro {
 					macro classnames.ClassNames.fromMaps([$a{maps}]);
 			};
 
-			if (exprs.head.length > 0)
-				return macro {
-					$a{exprs.head};
-					${retExpr};
-				};
-			else
-				return retExpr;
+			return retExpr;
 
 		} else {
 			var classesInfos = flattenClasses(classes, options, pos);
-			if (classesInfos.expr == null) return returnVoid(options);
+			if (classesInfos == null) return returnVoid(options);
 
-			var trimmedExpr = macro ${classesInfos.expr};
-			if (classesInfos.needsTrim) {
-				trimmedExpr = macro ${classesInfos.expr}.substr(1);
-			}
+			var trimmedExpr = trimLeft(classesInfos);
 
 			var retExpr= options.AsObject
 				? macro {className: ${trimmedExpr}}
 				: macro ${trimmedExpr};
 
-			if (classesInfos.head.length > 0)
-				return macro {
-					$a{classesInfos.head};
-					${retExpr};
-				};
-			else
-				return retExpr;
+			return retExpr;
 		}
+	}
+
+	static function trimLeft(e:Expr):Expr {
+		return switch (e) {
+			case macro " " + $e{e}: trimLeft(e);
+			case macro $e{left} + $e{right}: macro $e{trimLeft(left)} + $e{right};
+			case e: e;
+		};
 	}
 
 	static function returnVoid(options:FastOptions):Expr {
@@ -152,7 +154,7 @@ class FastMacro {
 			for (f in fields) {
 				var fieldName = f.field;
 				if (fieldName.startsWith("@$__hx__")) fieldName = fieldName.substr(8);
-				var fname:Expr = MacroStringTools.formatString(' ' + fieldName, f.expr.pos);
+				var fname:Expr = MacroStringTools.formatString(fieldName, f.expr.pos);
 
 				switch (f.expr.expr) {
 					case EConst(CIdent("false")):
@@ -165,32 +167,18 @@ class FastMacro {
 					try {
 						var value:Dynamic = ExprTools.getValue(f.expr);
 
-						// Workaround for haxe 4 rc2 and rc3, awaiting next release
-						if (value == 0) {
+						if (value == 0 || value == false || value == "" || value == null)
 							classes = appendClassExpr(classes, options, fieldName, fname, Ignored);
-							continue;
-						}
-
-						switch (value) {
-							// case false, 0, "", null: // Doesn't work in haxe 4 rc2 and rc3, fixed in dev builds
-							case false, "", null:
-							classes = appendClassExpr(classes, options, fieldName, fname, Ignored);
-
-							case true:
+						else if (value == true)
 							classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
-
-							case s if (Std.is(s, String)):
+						else if (Std.is(value, String))
 							classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
-
-							case i if (Std.is(i, Int) && i != 0):
+						else if (Std.is(value, Int) && value > 0)
 							classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
-
-							case f if (Std.is(f, Float) && f != 0):
+						else if (Std.is(value, Float) && value > 0)
 							classes = appendClassExpr(classes, options, fieldName, fname, Hardcoded);
-
-							default:
+						else
 							throw "Fallback to runtime";
-						}
 					} catch(e:Dynamic) {
 						var c = macro ${f.expr};
 						classes = appendClassExpr(classes, options, fieldName, fname, Runtime(c, fname));
@@ -229,7 +217,7 @@ class FastMacro {
 				appendFallback(classes, arg);
 
 				case t if (isInstOf(t, "String")):
-				appendRuntime(classes, macro $e{arg} == null ? "" : $e{arg});
+				appendRuntime(classes, arg);
 
 				case TInst(arrInst, [TInst(strInst, [])])
 				if (arrInst.toString() == "Array" && strInst.toString() == "String"):
@@ -346,10 +334,7 @@ class FastMacro {
 		classes:Array<ClassDefinition>,
 		options:FastOptions,
 		pos:Position
-	):{expr:Expr, head:Null<Array<Expr>>, needsTrim:Bool} {
-		var needsTrim = false;
-		var head:Array<Expr> = [];
-
+	):Expr {
 		var expr:Expr = Lambda.fold(classes, function(cdef, expr) {
 			return switch (cdef) {
 				case CompileTime(key, keyExpr, condition):
@@ -361,36 +346,32 @@ class FastMacro {
 					expr;
 
 					case Runtime(checkExpr, runtimeExpr):
-					head.push(checkExpr);
-					if (expr == null) needsTrim = true;
-					concatExprs(expr, macro ((untyped ${checkExpr}) ? ${runtimeExpr} : ""), pos);
+					concatExprs(expr, macro ((untyped ${checkExpr}) ? " " + ${runtimeExpr} : ""), pos, true);
 				}
 
 				case Runtime(runtimeExpr):
-				if (expr == null) needsTrim = true;
-				concatExprs(expr, macro " " + ${runtimeExpr}, pos);
+				concatExprs(expr, macro ${runtimeExpr}, pos);
 
 				case RuntimeArray(runtimeExpr):
-				if (expr == null) needsTrim = true;
-				concatExprs(expr, macro " " + ${runtimeExpr}.join(" "), pos);
+				concatExprs(expr, macro ${runtimeExpr}.join(" "), pos);
 
 				case Fallback(fallbackExpr):
-				if (expr == null) needsTrim = true;
 				concatExprs(
 					expr,
 					macro {
 						var a:String;
 						((untyped (a = classnames.ClassNames.fromMap(${fallbackExpr}))) ? " " + a : "");
 					},
-					pos
+					pos,
+					true
 				);
 			};
 		}, null);
 
-		return {expr: expr, head: head, needsTrim: needsTrim};
+		return expr;
 	}
 
-	static function concatExprs(prevExpr:Expr, newExpr:Expr, pos:Position):Expr {
+	static function concatExprs(prevExpr:Expr, newExpr:Expr, pos:Position, ?skipSpace:Bool = false):Expr {
 		if (prevExpr != null) {
 			switch (newExpr.expr) {
 				case EConst(CString(newStr)):
@@ -398,13 +379,12 @@ class FastMacro {
 					case EBinop(OpAdd, left, right):
 					switch (right.expr) {
 						case EConst(CString(rightStr)):
-						// rightStr = StringTools.trim(rightStr);
 						newStr = StringTools.trim(newStr);
 						return makeBinAdd(left, {expr: EConst(CString(rightStr + " " + newStr)), pos: pos}, pos);
 
 						default:
 						newStr = StringTools.trim(newStr);
-						newExpr = {expr: EConst(CString(" " + newStr)), pos: pos};
+						newExpr = {expr: EConst(CString(newStr)), pos: pos};
 					}
 
 					case EConst(CString(prevStr)):
@@ -414,7 +394,7 @@ class FastMacro {
 
 					default:
 					newStr = StringTools.trim(newStr);
-					newExpr = {expr: EConst(CString(" " + newStr)), pos: pos};
+					newExpr = {expr: EConst(CString(newStr)), pos: pos};
 				}
 
 				default:
@@ -422,7 +402,8 @@ class FastMacro {
 		}
 
 		if (prevExpr == null) return newExpr;
-		return makeBinAdd(prevExpr, newExpr, pos);
+		if (skipSpace) return makeBinAdd(prevExpr, trimLeft(newExpr), pos);
+		return makeBinAdd(prevExpr, macro " " + ${trimLeft(newExpr)}, pos);
 	}
 
 	static function makeBinAdd(left:Expr, right:Expr, pos:Position):Expr {
@@ -433,11 +414,20 @@ class FastMacro {
 		classes:Array<ClassDefinition>,
 		options:FastOptions,
 		pos:Position
-	):{head: Array<Expr>, maps: Array<Expr>} {
+	):Array<Expr> {
 		var maps = [];
-		var head = [];
 		var currentMap:Array<ObjectField> = [];
 		var hasRuntimeOrFallback = false;
+
+		for (cdef in classes) {
+			switch (cdef) {
+				case Runtime(_) | RuntimeArray(_) | Fallback(_):
+					hasRuntimeOrFallback = true;
+					break;
+
+				case _:
+			}
+		}
 
 		for (cdef in classes) {
 			switch (cdef) {
@@ -450,7 +440,6 @@ class FastMacro {
 					if (hasRuntimeOrFallback) currentMap.push({field: key, expr: macro false});
 
 					case Runtime(checkExpr, runtimeExpr):
-					head.push(checkExpr);
 					currentMap.push({field: key, expr: macro untyped ${checkExpr}});
 				}
 
@@ -462,26 +451,21 @@ class FastMacro {
 					a;
 				});
 				currentMap = [];
-				hasRuntimeOrFallback = true;
 
 				case RuntimeArray(expr):
 				closeMap(maps, currentMap, pos);
 				maps.push(macro classnames.ClassNames.arrayToMap(${expr}));
 				currentMap = [];
-				hasRuntimeOrFallback = true;
-				hasRuntimeOrFallback = true;
 
 				case Fallback(expr):
 				closeMap(maps, currentMap, pos);
 				maps.push(macro ${expr});
 				currentMap = [];
-				hasRuntimeOrFallback = true;
 			}
 		}
 
 		closeMap(maps, currentMap, pos);
-
-		return {head: head, maps: maps};
+		return maps;
 	}
 
 	static function closeMap(
