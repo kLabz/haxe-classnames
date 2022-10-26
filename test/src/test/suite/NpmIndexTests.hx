@@ -106,8 +106,10 @@ class NpmIndexTests extends SingleSuite {
 					b: false,
 					c: 0,
 					d: null,
-					e: 1
-				}).should.be("a e");
+					e: 1,
+					f: "abc",
+					g: ""
+				}).should.be("a e f");
 			});
 
 			it("joins arrays of class names and ignore falsy values", {
